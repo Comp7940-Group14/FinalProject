@@ -1,6 +1,6 @@
 In order to control the spread of the coronavirus now, China has promptly and decisively adopted various measures to deal with it, and then effectively curbed the adverse consequences of the coronavirus spreading to a large area around the world . In the current situation, China's every movement has become the focus of various media around the world.
 
-Our LINE bot which is established on LINE is related to public health care. We design three kinds of questions.
+Our LINE bot is related to public health care. We design three kinds of questions.
 
 Firstly, the question is about summarize of news. In order to better understand the situation of epidemic prevention, we will categorize the news related to the response, including current affairs tracking about the progress of the epidemic prevention; the establishment of relevant laws and regulations; social materials donations contain masks, alcohol and other medical supplies as well as food supplies; the support of medical teams from various places around the Country; the development of anti-epidemic drugs. Our chatbot will display those related News above to the public to make more people understand the specific process of protection against coronavirus infection.
 
@@ -8,5 +8,5 @@ Secondly, it inquires the distribution and quantity of pneumonia patients. he ne
 
 Finally, we hope that the robot can introduce some infectious diseases (including intestinal infectious diseases, respiratory disease, etc.) and chronic diseases (such as diabetes and hypertension) to users. For infectious diseases, including transmission routes, susceptible population, disease situation, etc. In addition, it can also show users some investigation reports of health risk factors. So far, we have found the data source which is the public health science data center. We want to get disease information from this platform data center. According to the information source, we plan to establish a simple disease classification, store it on the server for users' query, and guide users question.
 
-Our LINE bot which is established on LINE use a redis server to store some persistent information and run on Heroku. In addtion, it's written only with Python and use git for version controls. The design concept of the bot is applicable to our society while the content from the Internet. 
+Our LINE bot use a redis server to store some persistent information and run on Heroku. In addtion, it's written only with Python and use git for version controls. The design concept of the bot is applicable to our society while the content from the Internet. 
 
