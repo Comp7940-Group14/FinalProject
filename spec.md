@@ -8,5 +8,5 @@ Secondly, it inquires the distribution and quantity of pneumonia patients. he ne
 
 Finally, we hope that the robot can introduce some infectious diseases (including intestinal infectious diseases, respiratory disease, etc.) and chronic diseases (such as diabetes and hypertension) to users. For infectious diseases, including transmission routes, susceptible population, disease situation, etc. In addition, it can also show users some investigation reports of health risk factors. So far, we have found the data source which is the public health science data center. We want to get disease information from this platform data center. According to the information source, we plan to establish a simple disease classification, store it on the server for users' query, and guide users question.
 
-Our LINE bot use a redis server to store some persistent information and run on Heroku. In addtion, it's written only with Python and use git for version controls. The design concept of the bot is applicable to our society while the content from the Internet. 
+Our LINE bot use a redis server to store some persistent information and run on Heroku. In addtion, it's written only with Python and use git for version controls. The design concept of the bot is applicable to our society while the content from the Internet.. 
 
