@@ -4,3 +4,5 @@ line-bot-sdk
 requests
 BeautifulSoup4
 csv23
+pymysql
+

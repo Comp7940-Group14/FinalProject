@@ -2,11 +2,10 @@ from __future__ import unicode_literals
 
 import os
 import sys
-import redis
-import requests
-from bs4 import BeautifulSoup
-import csv
-
+import oprationDB as oDB
+import infectionClass as infect
+import patientClass as patient
+import hospitalMap as mp
 
 from argparse import ArgumentParser
 
@@ -19,7 +18,10 @@ from linebot.exceptions import (
 )
 
 from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage, ImageMessage, VideoMessage, FileMessage, StickerMessage, StickerSendMessage
+    MessageEvent, TextMessage, TextSendMessage, ImageMessage, VideoMessage, FileMessage, StickerMessage, StickerSendMessage, \
+    TemplateSendMessage, ButtonsTemplate, PostbackTemplateAction, MessageTemplateAction, URITemplateAction, \
+    FlexSendMessage, BubbleContainer, ImageComponent, URIAction, LocationSendMessage, \
+    BoxComponent, SpacerComponent, ButtonComponent, SeparatorComponent, ButtonComponent, TextComponent, IconComponent
 )
 from linebot.utils import PY3
 
@@ -50,47 +52,43 @@ def callback():
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
 
-    # ------------zwt---------------
-    global array1
-    if len(array1) == 0:
-        get_Diseases_Data()
-    # ------------zwt---------------
-
-
     # parse webhook body
     try:
         events = parser.parse(body, signature)
     except InvalidSignatureError:
         abort(400)
 
-    global diseases_layer
     # if event is MessageEvent and message is TextMessage, then echo text
     for event in events:
         if not isinstance(event, MessageEvent):
             continue
 
-        # ------------ouou---------------
+        # ------------add---------------
         if "infect" in event.message.text:
-            handle_Diseases_1(event)
+            array = infect.get_infect_array()
+            handle_Diseases_1(event, array)
             continue
 
-        if diseases_layer == 1:
+        result = infect.redisGet("diseases_layer")
+        if int(result) == 1:
             handle_Diseases_2(event)
             continue
 
-        if diseases_layer == 2:
+        if int(result) == 2:
             handle_Diseases_Content(event)
             continue
-        # ------------------------------
 
-        # ------------YuWangAs----------
+
         if "patient" in event.message.text:
             handle_Patient_Distribute(event)
-        # ------------------------------
+            continue
 
-        # ------------sunshine----------
         if "news" in event.message.text:
-            news(event)
+            handle_COVID_News(event)
+            continue
+
+        if "医院" in event.message.text:
+            handle_location_message(event)
             continue
         # ------------------------------
 
@@ -112,9 +110,25 @@ def callback():
 
     return 'OK'
 
+# Handler function for Location Message  113.99743053873469, 'lat': 22.53581126769833}
+def handle_location_message(event):
+    log,lat = mp.getlnglat(event.message.text)
+    if log == 0:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage("Can't find that hospital!")
+        )
+    else:
+        line_bot_api.reply_message(
+            event.reply_token,
+            LocationSendMessage(
+                title='医院', address=event.message.text,
+                latitude=lat, longitude=log
+            )
+        )
+
 # Handler function for Text Message
 def handle_TextMessage(event):
-    print(event.message.text)
     msg = 'You said: "' + event.message.text + '" '
     line_bot_api.reply_message(
         event.reply_token,
@@ -152,64 +166,12 @@ def handle_FileMessage(event):
     )
 
 
-
-# ------------ouou---------------
-diseases_layer = 0
-first_value = 0
-
-array1 = []
-array_sub = []
-address_sub = []
-
-
-def get_Diseases_Data():
-    diseases = 'http://www.phsciencedata.cn/Share/ky_sjml.jsp'
-    html = requests.get(diseases)  # connect to the server
-    bs = BeautifulSoup(html.text, 'html.parser')  # manage tags in HTML document
-
-    recommended_movies = bs.find('div', {'class': 'lanren'})
-    movie_list = recommended_movies.find_all('li', {'class': 'li2'})
-    global array1
-    array1 = []
-    global array_sub
-    array_sub = []
-    global address_sub
-    address_sub = []
-    for item in movie_list:
-        title = item.find('a').get_text()
-        array1.append(title)
-
-        sublist = item.find_all('li', {'class': 'li3'})
-        tempTitle = []
-        tempAdd = []
-
-        for item in sublist:
-            subtitle = item.find('a').get_text()
-            tempTitle.append(subtitle)
-
-            address = item.find('a').get('href')
-            tempAdd.append(address)
-
-        array_sub.append(tempTitle)
-        address_sub.append(tempAdd)
-    n = len(array1)-1
-    del(array1[n])
-
-def handle_Diseases_1(event):
-    print(event.message.text)
-    global diseases_layer
-    diseases_layer = 1
-    n=1
-    text = "In my database, there are the following categories:\n"
-    global array1
-    for item in array1:
-        text += str(n) + '.' + item + '\n'
-        n=n+1
-    text += "Please choose one diseases class number!"
-
+# ------------Infectiou Dieases---------------
+def handle_Diseases_1(event, array):
+    text = infect.get_Diseases_Text1(array)
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(text),
+        TextSendMessage(text)
     )
 
 def handle_Diseases_2(event):
@@ -219,120 +181,218 @@ def handle_Diseases_2(event):
             TextSendMessage("Please choose the diseases class number in the list!"),
         )
     else:
-        n = 1
-        global array1
-        i =  int(event.message.text)
-        array1[i]
-        text = "在(" + event.message.text + ")." + array1[i] + "中，有以下疾病：\n"
-        num = int(event.message.text)-1
-        global array_sub
-        for item in array_sub[num]:
-            text += str(n) + '.' + item + '\n'
-            n = n + 1
-        print(text)
-        text += "Please choose the diseases number!"
+        text = infect.get_Diseases_Text2(event.message.text)
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text),
         )
-        global diseases_layer
-        diseases_layer = 2
-        global first_value
-        first_value = int(event.message.text)
 
 def handle_Diseases_Content(event):
-    global first_value
-    global address_sub
-    n1 = first_value-1
-    temp = address_sub[n1]
+    first_value = infect.redisGet("first_layer_value")
+    address_sub = infect.redisGet("address_sub")
+    num = int(first_value) - 1
+    temp = address_sub[num]
+
     if int(event.message.text) > len(temp):
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage("Please choose the item number in the list"),
+            TextSendMessage("Please choose the item number in the list!"),
         )
     else:
-        prelink = 'http://www.phsciencedata.cn/Share/'
-        n2 = int(event.message.text)-1
-        link = prelink + temp[n2]
-
-        html = requests.get(link)  # connect to the server
-        bs = BeautifulSoup(html.text, 'html.parser')  # manage tags in HTML document
-
-        recommended_movies = bs.find('div', {'id': 'tabs-note'})
-        text_list = recommended_movies.find_all('span')
-
-        arr = []
-        for strContent in text_list:
-            text = strContent.get_text().strip()
-            arr.append(text)
-
-        origin = []
-        for i in range(len(arr)):
-            if arr[i] not in origin:
-                origin.append(arr[i])
-        print('\n'.join(origin))
-
+        text = infect.get_Diseases_Content(event.message.text, temp)
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage('\n'.join(origin)),
+            TextSendMessage(text)
         )
-        global diseases_layer
-        diseases_layer = 0
-# ---------------------------------
+# -------------------------------------------
 
-# ------------YuWangAs-------------
+
+# ------------Patient Distribute-------------
 def handle_Patient_Distribute(event):
-    # df = pd.read_csv("patients.csv", index=None)
-    # text = str(df[:3])
-    str = event.message.text
-    arr = str.split(' ')
-    n = len(arr)-1
-
-    text = ''
-    temp = ''
-    day = 0
-    with open("patients.csv" , newline='', encoding='UTF-8') as csvfile:
-        rows = csv.reader(csvfile)
-        for row in rows:
-            if row[0] == "Date":
-                text += row[0] + '      ' + row[1] + ' ' + row[2] + "\n"
-            else:
-                text += row[0] + ' ' + row[1] + ' '+ row[2] + "\n"
-
-            if arr[n] == row[1]:
-                if day == 1:
-                    text = temp + "\n" + row[0] + ' ' + row[1] + ' ' + row[2]
-                    break
-                temp = row[0] + ' ' + row[1] + ' ' + row[2]
-                day = 1
-
+    text = patient.get_Patient_Distribute_Text(event.message.text)
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text)
     )
-# ---------------------------------
+# -------------------------------------------
 
-# ------------sunshine------------
-def news(event):
-    link ='https://www.globaltimes.cn//special-coverage/Coronavirus-Outbreak.html'
-    html = requests.get(link)  # connect to the server
-    bs = BeautifulSoup(html.text, 'html.parser')  # manage tags in HTML document
 
-    recommended_movies = bs.find('div', {'class': 'op-news'})
-    movie_list = recommended_movies.find_all('div', {'class': 'news'})
+# ----------------COVID News-----------------
+def handle_COVID_News(event):
+    title, href, img, imgtitle, imghref, showinTilte = oDB.get_news_data(event.message.text)
+    if len(title) == 0 :
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage("There no news in that day in our database.")
+        )
+        return
 
-    content = 'The Coronavirus news list from Global Times:\n\n'
-    for item in movie_list:
-        title = item.find('a').get_text()
-        content += title + "\n\n"
-
+    message = get_news_message(title, href, img, imghref, showinTilte)
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(content),
+        message
     )
+    oDB.insert_news_data(title, href, img, imgtitle, imghref)
+
+
+def get_news_message(title, href, img, imghref, showinTilte):
+    cont = []
+    for i in range(len(title)):
+        row = BoxComponent(
+            layout='baseline',
+            spacing='sm',
+            contents=[
+                TextComponent(
+                    text=title[i],
+                    color='#666666',
+                    size='sm',
+                    margin='md',
+                    wrap=True,
+                    action=URIAction(label='WEBSITE', uri=href[i])
+                )
+            ],
+        )
+        cont.append(row)
+        cont.append(SeparatorComponent())
+    del (cont[-1])
+
+    title = 'Top News' + showinTilte
+    bubble = BubbleContainer(
+        direction='ltr',
+        hero=ImageComponent(
+            url=img[0],
+            size='full',
+            aspect_ratio='20:13',
+            aspect_mode='cover',
+            action=URIAction(uri=imghref[0], label='label')
+        ),
+        body=BoxComponent(
+            layout='vertical',
+            contents=[
+                # title
+                TextComponent(text=title, weight='bold', size='xl'),
+                # info
+                BoxComponent(
+                    layout='vertical',
+                    margin='lg',
+                    spacing='sm',
+                    contents=cont,
+                )
+            ],
+        )
+    )
+
+    message = FlexSendMessage(alt_text="hello", contents=bubble)
+    return message
+
+
+    # bubble = BubbleContainer(
+    #     direction='ltr',
+    #     hero=ImageComponent(
+    #         url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg',
+    #         size='full',
+    #         aspect_ratio='20:13',
+    #         aspect_mode='cover',
+    #         action=URIAction(uri='http://example.com', label='label')
+    #     ),
+    #     body=BoxComponent(
+    #         layout='vertical',
+    #         contents=[
+    #             # title
+    #             TextComponent(text='Brown Cafe', weight='bold', size='xl'),
+    #             # review
+    #             BoxComponent(
+    #                 layout='baseline',
+    #                 margin='md',
+    #                 contents=[
+    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
+    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
+    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
+    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
+    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
+    #                     TextComponent(text='4.0', size='sm', color='#999999', margin='md',
+    #                                   flex=0)
+    #                 ]
+    #             ),
+    #             # info
+    #             BoxComponent(
+    #                 layout='vertical',
+    #                 margin='lg',
+    #                 spacing='sm',
+    #                 contents=[
+    #                     BoxComponent(
+    #                         layout='baseline',
+    #                         spacing='sm',
+    #                         contents=[
+    #                             TextComponent(
+    #                                 text='Place',
+    #                                 color='#aaaaaa',
+    #                                 size='sm',
+    #                                 flex=1
+    #                             ),
+    #                             TextComponent(
+    #                                 text='Shinjuku, Tokyo',
+    #                                 wrap=True,
+    #                                 color='#666666',
+    #                                 size='sm',
+    #                                 flex=5
+    #                             )
+    #                         ],
+    #                     ),
+    #                     BoxComponent(
+    #                         layout='baseline',
+    #                         spacing='sm',
+    #                         contents=[
+    #                             TextComponent(
+    #                                 text='Time',
+    #                                 color='#aaaaaa',
+    #                                 size='sm',
+    #                                 flex=1
+    #                             ),
+    #                             TextComponent(
+    #                                 text="10:00 - 23:00",
+    #                                 wrap=True,
+    #                                 color='#666666',
+    #                                 size='sm',
+    #                                 flex=5,
+    #                                 action=URIAction(label='WEBSITE', uri="https://example.com")
+    #                             ),
+    #                         ],
+    #                     ),
+    #                 ],
+    #             )
+    #         ],
+    #     ),
+    #     footer=BoxComponent(
+    #         layout='vertical',
+    #         spacing='sm',
+    #         contents=[
+    #             # callAction, separator, websiteAction
+    #             SpacerComponent(size='sm'),
+    #             # callAction
+    #             ButtonComponent(
+    #                 style='link',
+    #                 height='sm',
+    #                 action=URIAction(label='CALL', uri='tel:000000'),
+    #             ),
+    #             # separator
+    #             SeparatorComponent(),
+    #             # websiteAction
+    #             ButtonComponent(
+    #                 style='link',
+    #                 height='sm',
+    #                 action=URIAction(label='WEBSITE', uri="https://example.com")
+    #             )
+    #         ]
+    #     ),
+    # )
+    # message = FlexSendMessage(alt_text="hello", contents=bubble)
+    # line_bot_api.reply_message(
+    #     event.reply_token,
+    #     message
+    # )
+
 # -------------------------------
-
-
 if __name__ == "__main__":
     arg_parser = ArgumentParser(
         usage='Usage: python ' + __file__ + ' [--port <port>] [--help]'
