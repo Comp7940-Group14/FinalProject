@@ -2,10 +2,12 @@ from __future__ import unicode_literals
 
 import os
 import sys
+import re, string
 import oprationDB as oDB
 import infectionClass as infect
-import patientClass as patient
+import patientClass as pa
 import hospitalMap as mp
+
 
 from argparse import ArgumentParser
 
@@ -21,7 +23,8 @@ from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage, ImageMessage, VideoMessage, FileMessage, StickerMessage, StickerSendMessage, \
     TemplateSendMessage, ButtonsTemplate, PostbackTemplateAction, MessageTemplateAction, URITemplateAction, \
     FlexSendMessage, BubbleContainer, ImageComponent, URIAction, LocationSendMessage, \
-    BoxComponent, SpacerComponent, ButtonComponent, SeparatorComponent, ButtonComponent, TextComponent, IconComponent
+    BoxComponent, SpacerComponent, ButtonComponent, SeparatorComponent, ButtonComponent, TextComponent, IconComponent, \
+    ImageCarouselColumn, ImageCarouselTemplate, ConfirmTemplate
 )
 from linebot.utils import PY3
 
@@ -63,7 +66,13 @@ def callback():
         if not isinstance(event, MessageEvent):
             continue
 
-        # ------------add---------------
+
+        # ---------------help--------------------
+        if "help" in event.message.text:
+            handle_Nav(event)
+            continue
+
+        # ----------infectiou diseases-----------
         if "infect" in event.message.text:
             array = infect.get_infect_array()
             handle_Diseases_1(event, array)
@@ -78,19 +87,33 @@ def callback():
             handle_Diseases_Content(event)
             continue
 
+        # --------patients distribution----------
+        if "Introduce patients distribution" in event.message.text:
+            handle_Patient_Introduce(event)
+            continue
 
         if "patient" in event.message.text:
             handle_Patient_Distribute(event)
+            continue
+
+        # ----------------news---------------
+        if "news" in event.message.text and "coronavirus pneumonia" in event.message.text:
+            handle_News_Type(event)
+            continue
+
+        if "news" in event.message.text and "pic" in event.message.text:
+            handle_Pic_News(event)
             continue
 
         if "news" in event.message.text:
             handle_COVID_News(event)
             continue
 
+        # ---------------hospital---------------
         if "医院" in event.message.text:
             handle_location_message(event)
             continue
-        # ------------------------------
+
 
         if isinstance(event.message, TextMessage):
             handle_TextMessage(event)
@@ -110,22 +133,7 @@ def callback():
 
     return 'OK'
 
-# Handler function for Location Message  113.99743053873469, 'lat': 22.53581126769833}
-def handle_location_message(event):
-    log,lat = mp.getlnglat(event.message.text)
-    if log == 0:
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage("Can't find that hospital!")
-        )
-    else:
-        line_bot_api.reply_message(
-            event.reply_token,
-            LocationSendMessage(
-                title='医院', address=event.message.text,
-                latitude=lat, longitude=log
-            )
-        )
+
 
 # Handler function for Text Message
 def handle_TextMessage(event):
@@ -166,6 +174,37 @@ def handle_FileMessage(event):
     )
 
 
+# --------------------Help-------------------------
+def handle_Nav(event):
+    message = TemplateSendMessage(
+        alt_text = 'Buttons template',
+        template = ButtonsTemplate(
+            thumbnail_image_url = 'https://wx4.sinaimg.cn/large/682cebefly1gd5yxplyt6j20fa08lqao.jpg',
+            title = 'Menu',
+            text = 'Hi！I could provide the following functions: ',
+            actions = [
+                MessageTemplateAction(
+                    label='Patients distribute',
+                    text='Introduce patients distribution'
+                ),
+                MessageTemplateAction(
+                    label='Coronavirus news',
+                    text='What\'s news about coronavirus pneumonia?'
+                ),
+                MessageTemplateAction(
+                    label='Infectious diseases',
+                    text='Could you provide information about infection diseases?'
+                ),
+                MessageTemplateAction(
+                    label='Hospital location',
+                    text='You could say hospital name like: 珠海中山大学第五医院'
+                )
+            ]
+        )
+    )
+    line_bot_api.reply_message(event.reply_token, message)
+
+
 # ------------Infectiou Dieases---------------
 def handle_Diseases_1(event, array):
     text = infect.get_Diseases_Text1(array)
@@ -204,20 +243,126 @@ def handle_Diseases_Content(event):
             event.reply_token,
             TextSendMessage(text)
         )
-# -------------------------------------------
+
 
 
 # ------------Patient Distribute-------------
+def handle_Patient_Introduce(event):
+
+    textlist = ['See coronavirus pneumonia patients distribution (Update to 3.27)', \
+                'Check the distribution of patients in China in some day (must choose a date, provided 1.22-3.27)', \
+                'View patients distribution in a country (must choose a date, provided 1.22-3.27)', \
+                'Look patients distributionis in a province or region']
+
+    questionlist = ['I want to know coronavirus pneumonia patients distribution.', \
+                'How\'s patients distributionis in China in 3.23?', \
+                'How\'s patients condition about US in 2.24?', \
+                'How\'s patients distributionis in Hubei?']
+
+    cont = []
+    for i in range(4):
+        row = BoxComponent(
+            layout='baseline',
+            spacing='sm',
+            contents=[
+                TextComponent(text = textlist[i], color='#666666', size='sm', margin='md', wrap=True,
+                    action=MessageTemplateAction(text=questionlist[i])
+                )
+            ],
+        )
+        cont.append(row)
+        cont.append(SeparatorComponent())
+    del (cont[-1])
+
+    title = 'You could ask following four type questions:'
+    bubble = BubbleContainer(
+        direction='ltr',
+        body=BoxComponent(
+            layout='vertical',
+            contents=[
+                TextComponent(text=title, weight='bold', wrap=True, size='md'),
+                BoxComponent(layout='vertical', margin='lg', spacing='sm', contents=cont)
+            ]
+        )
+    )
+
+    message = FlexSendMessage(alt_text="hello", contents=bubble)
+    line_bot_api.reply_message(
+        event.reply_token,
+        message
+    )
+
 def handle_Patient_Distribute(event):
-    text = patient.get_Patient_Distribute_Text(event.message.text)
+    df = pa.get_Patient_Distribute_Text(event.message.text)
+
+    if df == "1":
+        text = "we don't have data in that day!"
+    elif df == "2":
+        text = "we don't have data!"
+    else:
+        text = df
+
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text)
     )
-# -------------------------------------------
 
 
 # ----------------COVID News-----------------
+def handle_News_Type(event):
+    message = TemplateSendMessage(
+        alt_text='Confirm template',
+        template=ConfirmTemplate(
+            text='Do you want to see news list or Pictures?',
+            actions=[
+                MessageTemplateAction(
+                    label='List',
+                    text='I\'d like to see news list.',
+                ),
+                MessageTemplateAction(
+                    label='Picture',
+                    text='I\'d like to see pictures of news.'
+                )
+            ]
+        )
+    )
+    line_bot_api.reply_message(event.reply_token, message)
+
+def handle_Pic_News(event):
+    title, href, img, imgtitle, imghref, showinTilte = oDB.get_news_data(event.message.text)
+    if len(img) == 0 :
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage("There no news pic in that day in our database.")
+        )
+        return
+
+    message = get_pic_message(title, href, img, imghref, showinTilte)
+    line_bot_api.reply_message(
+        event.reply_token,
+        message
+    )
+
+def get_pic_message(title, href, img, imghref, showinTilte):
+    ImgList = []
+    for i in range(len(img)):
+        item = ImageCarouselColumn(
+            image_url = img[i],
+            action = URIAction(
+                uri = imghref[i],
+                label = 'Image News' + str(i+1),
+            ))
+        ImgList.append(item)
+
+    message = TemplateSendMessage(
+        alt_text = 'ImageCarousel template',
+        template = ImageCarouselTemplate(
+            columns = ImgList
+        )
+    )
+    return message
+
+
 def handle_COVID_News(event):
     title, href, img, imgtitle, imghref, showinTilte = oDB.get_news_data(event.message.text)
     if len(title) == 0 :
@@ -286,111 +431,30 @@ def get_news_message(title, href, img, imghref, showinTilte):
     return message
 
 
-    # bubble = BubbleContainer(
-    #     direction='ltr',
-    #     hero=ImageComponent(
-    #         url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg',
-    #         size='full',
-    #         aspect_ratio='20:13',
-    #         aspect_mode='cover',
-    #         action=URIAction(uri='http://example.com', label='label')
-    #     ),
-    #     body=BoxComponent(
-    #         layout='vertical',
-    #         contents=[
-    #             # title
-    #             TextComponent(text='Brown Cafe', weight='bold', size='xl'),
-    #             # review
-    #             BoxComponent(
-    #                 layout='baseline',
-    #                 margin='md',
-    #                 contents=[
-    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
-    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
-    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
-    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
-    #                     IconComponent(size='sm', url='https://img.soufunimg.com/news/2017_08/23/home/1503466431358_000.jpg'),
-    #                     TextComponent(text='4.0', size='sm', color='#999999', margin='md',
-    #                                   flex=0)
-    #                 ]
-    #             ),
-    #             # info
-    #             BoxComponent(
-    #                 layout='vertical',
-    #                 margin='lg',
-    #                 spacing='sm',
-    #                 contents=[
-    #                     BoxComponent(
-    #                         layout='baseline',
-    #                         spacing='sm',
-    #                         contents=[
-    #                             TextComponent(
-    #                                 text='Place',
-    #                                 color='#aaaaaa',
-    #                                 size='sm',
-    #                                 flex=1
-    #                             ),
-    #                             TextComponent(
-    #                                 text='Shinjuku, Tokyo',
-    #                                 wrap=True,
-    #                                 color='#666666',
-    #                                 size='sm',
-    #                                 flex=5
-    #                             )
-    #                         ],
-    #                     ),
-    #                     BoxComponent(
-    #                         layout='baseline',
-    #                         spacing='sm',
-    #                         contents=[
-    #                             TextComponent(
-    #                                 text='Time',
-    #                                 color='#aaaaaa',
-    #                                 size='sm',
-    #                                 flex=1
-    #                             ),
-    #                             TextComponent(
-    #                                 text="10:00 - 23:00",
-    #                                 wrap=True,
-    #                                 color='#666666',
-    #                                 size='sm',
-    #                                 flex=5,
-    #                                 action=URIAction(label='WEBSITE', uri="https://example.com")
-    #                             ),
-    #                         ],
-    #                     ),
-    #                 ],
-    #             )
-    #         ],
-    #     ),
-    #     footer=BoxComponent(
-    #         layout='vertical',
-    #         spacing='sm',
-    #         contents=[
-    #             # callAction, separator, websiteAction
-    #             SpacerComponent(size='sm'),
-    #             # callAction
-    #             ButtonComponent(
-    #                 style='link',
-    #                 height='sm',
-    #                 action=URIAction(label='CALL', uri='tel:000000'),
-    #             ),
-    #             # separator
-    #             SeparatorComponent(),
-    #             # websiteAction
-    #             ButtonComponent(
-    #                 style='link',
-    #                 height='sm',
-    #                 action=URIAction(label='WEBSITE', uri="https://example.com")
-    #             )
-    #         ]
-    #     ),
-    # )
-    # message = FlexSendMessage(alt_text="hello", contents=bubble)
-    # line_bot_api.reply_message(
-    #     event.reply_token,
-    #     message
-    # )
+
+# ----------------Hospital location-----------------
+# Handler function for Location Message  113.99743053873469, 'lat': 22.53581126769833}
+def handle_location_message(event):
+
+    exclude = set(string.punctuation)
+    address = ''.join(ch for ch in event.message.text if ch not in exclude)
+    address = re.sub('[a-zA-Z]', '', address)
+    address = address.replace(' ', '')
+
+    log, lat = mp.getlnglat(address)
+    if log == 0:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage("Can't find that hospital!")
+        )
+    else:
+        line_bot_api.reply_message(
+            event.reply_token,
+            LocationSendMessage(
+                title='Hospital', address=address, latitude=lat, longitude=log
+            )
+        )
+
 
 # -------------------------------
 if __name__ == "__main__":
