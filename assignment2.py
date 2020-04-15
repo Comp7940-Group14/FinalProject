@@ -3,10 +3,10 @@ from __future__ import unicode_literals
 import os
 import sys
 import re, string
-import oprationDB as oDB
+import patientClass as patient
+import newsClass as news
 import infectionClass as infect
-import patientClass as pa
-import hospitalMap as mp
+import hospitalMap as map
 
 
 from argparse import ArgumentParser
@@ -80,12 +80,20 @@ def callback():
 
         result = infect.redisGet("diseases_layer")
         if int(result) == 1:
-            handle_Diseases_2(event)
-            continue
+            res = re.findall(r"\d+\.?\d*", event.message.text)
+            if len(res) == 0:
+                infect.redisSet("diseases_layer", "0")
+            else:
+                handle_Diseases_2(event)
+                continue
 
         if int(result) == 2:
-            handle_Diseases_Content(event)
-            continue
+            res = re.findall(r"\d+\.?\d*", event.message.text)
+            if len(res) == 0:
+                infect.redisSet("diseases_layer", "0")
+            else:
+                handle_Diseases_Content(event)
+                continue
 
         # --------patients distribution----------
         if "Introduce patients distribution" in event.message.text:
@@ -214,7 +222,8 @@ def handle_Diseases_1(event, array):
     )
 
 def handle_Diseases_2(event):
-    if int(event.message.text) >= 7 or int(event.message.text) <= 0:
+    res = re.findall(r"\d+\.?\d*", event.message.text)
+    if int(res[0]) >= 7 or int(res[0]) <= 0:
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage("Please choose the diseases class number in the list!"),
@@ -232,7 +241,8 @@ def handle_Diseases_Content(event):
     num = int(first_value) - 1
     temp = address_sub[num]
 
-    if int(event.message.text) > len(temp):
+    res = re.findall(r"\d+\.?\d*", event.message.text)
+    if int(res[0]) > len(temp):
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage("Please choose the item number in the list!"),
@@ -293,12 +303,12 @@ def handle_Patient_Introduce(event):
     )
 
 def handle_Patient_Distribute(event):
-    df = pa.get_Patient_Distribute_Text(event.message.text)
 
+    df = patient.get_Patient_Distribute_Text(event.message.text)
     if df == "1":
-        text = "we don't have data in that day!"
+        text = "We don't have data in that day!"
     elif df == "2":
-        text = "we don't have data!"
+        text = "We don't have data!"
     else:
         text = df
 
@@ -329,7 +339,7 @@ def handle_News_Type(event):
     line_bot_api.reply_message(event.reply_token, message)
 
 def handle_Pic_News(event):
-    title, href, img, imgtitle, imghref, showinTilte = oDB.get_news_data(event.message.text)
+    title, href, img, imgtitle, imghref, showinTilte = news.get_news_data(event.message.text)
     if len(img) == 0 :
         line_bot_api.reply_message(
             event.reply_token,
@@ -364,7 +374,8 @@ def get_pic_message(title, href, img, imghref, showinTilte):
 
 
 def handle_COVID_News(event):
-    title, href, img, imgtitle, imghref, showinTilte = oDB.get_news_data(event.message.text)
+
+    title, href, img, imgtitle, imghref, showinTilte = news.get_news_data(event.message.text)
     if len(title) == 0 :
         line_bot_api.reply_message(
             event.reply_token,
@@ -377,7 +388,7 @@ def handle_COVID_News(event):
         event.reply_token,
         message
     )
-    oDB.insert_news_data(title, href, img, imgtitle, imghref)
+    news.insert_news_data(title, href, img, imgtitle, imghref)
 
 
 def get_news_message(title, href, img, imghref, showinTilte):
@@ -441,7 +452,7 @@ def handle_location_message(event):
     address = re.sub('[a-zA-Z]', '', address)
     address = address.replace(' ', '')
 
-    log, lat = mp.getlnglat(address)
+    log, lat = map.getlnglat(address)
     if log == 0:
         line_bot_api.reply_message(
             event.reply_token,

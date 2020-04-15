@@ -106,12 +106,7 @@ def connectfunc():
     )
     return connect
 
-
-def getNewsfromWeb():
-
-    news ='https://www.globaltimes.cn//special-coverage/Coronavirus-Outbreak.html'
-    html = requests.get(news)  # connect to the server
-    bs = BeautifulSoup(html.text, 'html.parser')  # manage tags in HTML document
+def getlist(bs):
 
     recommended_movies = bs.find('div', {'class': 'op-news'})
     movie_list = recommended_movies.find_all('div', {'class': 'news'})
@@ -122,24 +117,32 @@ def getNewsfromWeb():
         title.append(item.find('a').get_text())
         href.append(item.find('a').get('href'))
 
-    # print(title)
-    # print(href)
+    return title, href
+
+def getpic(bs):
+
+    top = bs.find('div', {'id': 'carousel-main-img'})
+    img_list = top.find_all('div', {'class': 'item'})
 
     img = []
     imgtitle = []
     imghref = []
-    top = bs.find('div', {'id': 'carousel-main-img'})
-    img_list = top.find_all('div', {'class': 'item'})
     for item in img_list:
         img.append(item.find('img', {'class': 'main_img'}).get('src'))
-
         next = item.find('div', {'class': 'main_caption'})
         imgtitle.append(next.find('a').get_text())
         imghref.append(next.find('a').get('href'))
 
-    # print(img)
-    # print(imgtitle)
-    # print(imghref)
+    return img, imgtitle, imghref
+
+def getNewsfromWeb():
+
+    news ='https://www.globaltimes.cn//special-coverage/Coronavirus-Outbreak.html'
+    html = requests.get(news)  # connect to the server
+    bs = BeautifulSoup(html.text, 'html.parser')  # manage tags in HTML document
+
+    title, href = getlist(bs)
+    img, imgtitle, imghref = getpic(bs)
 
     return title, href, img, imgtitle, imghref
 

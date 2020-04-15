@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import re, string
-
+import multiprocessing as mp
 
 def get_Patient_Distribute_Text(msg):
 
@@ -138,26 +138,29 @@ def patientDisByRegion(msg):
     strProvince = ' '.join(regionlist)
     # strProvince = ' '.join(list[i] for i in range(n+1, len(list)))
 
-    df1 = pd.read_csv("covid20_time_report/time_series_19-covid-Confirmed_archived_0325.csv")
-    df1 = df1.loc[df1.iloc[:, 0] == strProvince]
-    if df1.empty == True:
-        # print("We don't have data!")
+    pool = mp.Pool(processes=3)
+    multi_res = [pool.apply_async(file, (i, strProvince))for i in range(3)]
+    df = [res.get() for res in multi_res]
+
+    if isinstance(df[0], int):
         return 2
 
-    df1 = pd.melt(df1)
-
-    df2 = pd.read_csv("covid20_time_report/time_series_19-covid-Deaths_archived_0325.csv")
-    df2 = df2.loc[df2.iloc[:, 0] == strProvince]
-    df2 = pd.melt(df2)
-
-    df3 = pd.read_csv("covid20_time_report/time_series_19-covid-Recovered_archived_0325.csv")
-    df3 = df3.loc[df3.iloc[:, 0] == strProvince]
-    df3 = pd.melt(df3)
-
-    df = pd.merge(df1, df2, on='variable')
-    df = pd.merge(df, df3, on='variable')
+    temp = pd.merge(df[0], df[1], on='variable')
+    df = pd.merge(temp, df[2], on='variable')
 
     df = df.drop([0, 1, 2, 3], axis=0, inplace=False)
     df.columns = ['Date', 'Confirmed', 'Deaths', 'Healed']
     df.set_index(["Date"], inplace=True)
+    return df
+
+
+def file(i, strProvince):
+    list = ["covid20_time_report/time_series_19-covid-Confirmed_archived_0325.csv",
+            "covid20_time_report/time_series_19-covid-Deaths_archived_0325.csv",
+            "covid20_time_report/time_series_19-covid-Recovered_archived_0325.csv"]
+    df = pd.read_csv(list[i])
+    df = df.loc[df.iloc[:, 0] == strProvince]
+    if df.empty == True:
+        return 2
+    df = pd.melt(df)
     return df
